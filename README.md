@@ -3,8 +3,11 @@ In a typical React app, data is passed top-down via props, like this:
 
 ```javascript
 class App extends React.Component {
+  state = {
+    theme: "dark"
+  }
   render() {
-    return <Toolbar theme="dark" />
+    return <Toolbar theme={this.state.theme} />
   }
 }
 
@@ -19,9 +22,9 @@ const ThemedButton = ({ theme }) => (
 )
 ```
 
-`Button` needs to know the theme, so it needs to be passed through `Toolbar` for `Button` to get access to it. This process, passing components down from a higher parent down through components that don't even necessarily need it, so they can get to components lower down the chain, is called 'prop drilling'.
+`Button` wants to know the theme, so it needs to be passed down from `App`, through `Toolbar`, and into `ThemedButton` for the `Button` to finally get access to it. This process, passing components down from a higher parent down through components that don't even necessarily need it, so they can get to components lower down the chain, is called 'prop drilling'.
 
-This process is known as 'prop drilling', and it's kind of a pain in the ass.
+It's kind of a pain in the ass. Usually the way this is solved is through some kind of 3rd party state management library like Redux or Mobx.
 
 # Now, with context!
 
@@ -33,7 +36,7 @@ class App extends React.Component {
     return (
       <ThemeContext.Provider value="dark">
         <Toolbar />
-      </ThemeContext>
+      </ThemeContext.Provider>
     )
   }
 }
@@ -47,7 +50,7 @@ const Toolbar = () => (
 const ThemedButton = () => (
   <ThemeContext.Consumer>
     {theme => <Button theme={theme}> />}
-  </ThemeContext>
+  </ThemeContext.Consumer>
 )
 ```
 
@@ -55,39 +58,39 @@ By taking advantage of the `consumer/provider` components offered to us by `crea
 
 # Breaking it down
 
-The Context API can be broken down into three steps:
+The Context API can be broken down into three basic pieces:
 
 
-## createContext
+## The createContext method
 The `createContext` method has this signature:
 
 ```javascript
 React.createContext(defaultValue);
 ```
 
-It returns a `{ Provider, Consumer }` pair. You can use it like this:
+It returns an object which holds a `{ Provider, Consumer }` pair. You can destructure it like this:
 
 ```javascript
 const { Provider, Consumer } = React.createContext()
 
-// ...
+// which gives you access to a <Provider> component
+<Provider></Provder>
 
-<Provider>
-<Consumer>
+// and a <Consumer> component
+<Consumer></Consumer>
 ```
 
-or like this:
+or like this in the 'compound component' style:
 
 ```javascript
 const Context = React.createContext()
 
-// ...
+// now we have
+<Context.Provider></Context.Provider>
 
-<Context.Provider>
-<Context.Consumer>
+// and
+<Context.Consumer></Context.Consumer>
 ```
-
-the `createContext` method also accepts a `defaultValue`. We'll talk about what this does in a bit.
 
 ## The Provider
 
@@ -98,9 +101,9 @@ The `Provider` looks like this:
 
 It's a React component that you can pass some value in to as a prop. Whenever that value changes, any of the Provider's `Consumer` pairs will be notified of the updated value.
 
-A single `Provider` can have many consumers, and many consumers only ever belong to one Provider.
+A single `Provider` can have many consumers.
 
-## Consume
+## Consumer
 
 The `Consumer` looks like this:
 
@@ -110,11 +113,108 @@ The `Consumer` looks like this:
 </Consumer>
 ```
 
-The `Consumer` receives whatever value was passed into its `<Provider>`. 
+The `Consumer` receives whatever value was passed into its `<Provider>` pair.
 
 Whenever the `Provider`'s value changes, the `Consumer` re-renders and receives the new value (as a `render prop`!)
 
 ## Looking at it all together:
+Let's imagine we want different parts of our application to know which language our app should currently be rendering in:
+
+```javascript
+// create our Provider and Consumer pair, store them in LanguageContext
+const LanguageContext = React.createContext()
+
+// first, we wrap the highest level component we want to know about our language in our Provider
+const App = () => (
+  <div>
+    <LanguageContext.Provider value={'english'}>
+      <Header />
+    </LanguageContext>
+  </div>
+)
+
+// just a plain ol' react component, nothing to see here
+const Header = () => (
+  <header>
+    <CurrentLanguage />
+  </header>
+)
+
+// We wrap our child component that wants to know about the parent's value in our Consumer
+const CurrentLanguage = () => (
+  <LanguageContext.Consumer>
+    {val => <div>Current Language: {val}</div>} {/* english */}
+  </LanguageContext.Consumer>
+)
+```
+
+## Accessing Context in Lifecycle Methods
+Context can be accessed in lifecycle methods through a higher order function that returns your consumed component, like this:
+
+```javascript
+class Button extends React.Component {
+  componentDidMount() {
+    // ThemeContext value is this.props.theme
+  }
+
+  componentDidUpdate(prevProps, prevState) {
+    // Previous ThemeContext value is prevProps.theme
+    // New ThemeContext value is this.props.theme
+  }
+
+  render() {
+    const {theme, children} = this.props;
+    return (
+      <button className={theme ? 'dark' : 'light'}>
+        {children}
+      </button>
+    );
+  }
+}
+
+export default props => (
+  <ThemeContext.Consumer>
+    {theme => <Button {...props} theme={theme} />}
+  </ThemeContext.Consumer>
+);
+```
+
+## Some Gotchas
+Context uses reference identity to determine when to re-render, which means this:
+```javascript
+class App extends React.Component {
+  render() {
+    return (
+      <Provider value={{something: 'something'}}>
+        <Toolbar />
+      </Provider>
+    );
+  }
+}
+```
+
+will cause all child consumers to re-render (since a new object literal gets passed in every time the App component renders, regardless of if the value of `value` has changed.
+
+To solve this, simply lift the value into `App`'s state:
+
+```javascript
+class App extends React.Component {
+  constructor(props) {
+    super(props);
+    this.state = {
+      value: {something: 'something'},
+    };
+  }
+
+  render() {
+    return (
+      <Provider value={this.state.value}>
+        <Toolbar />
+      </Provider>
+    );
+  }
+}
+```
 
 ## Is Context the Redux killer?
 As Redux maintainer Mark Erikson states in his blog post <a href="http://blog.isquaredsoftware.com/2018/03/redux-not-dead-yet/">Redux - Not Dead Yet!</a>:
@@ -136,7 +236,10 @@ React Redux uses context internally but it doesn’t expose this fact in the pub
 Probably not. Or if you do, use it for relatively static application wide settings (locale and theme are the two that immediately come to mind).
 
 ## So when should you use context?
-Context is actually a really great thing to introduce to people who are relatively new to React and want to take the next step in thinking about state management within their application. It's a nice gentle introduction to pub/sub and flux architecture.
+There are a few uses cases where you might want to use context:
+- You have a value you want to share in a lot of different parents of your application and don't want to clutter up your app through prop drilling
+- You're relatively new to the app ecosystem and want to take advantage of shared component state, or want to take the first steps towards a flux/redux style approach to state management in your application.
+- You're a library maintainer and you want to build a state management solution similar to something like `redux`.
 
 ## Additional Reading
 - <a href="https://reactjs.org/docs/context.html">Official React Context Documentation</a>
