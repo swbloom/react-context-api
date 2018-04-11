@@ -218,19 +218,18 @@ class App extends React.Component {
 
 ## Is Context the Redux killer?
 As Redux maintainer Mark Erikson states in his blog post <a href="http://blog.isquaredsoftware.com/2018/03/redux-not-dead-yet/">Redux - Not Dead Yet!</a>:
-```
-Context is great for passing down props without needing intermediary components. If that's all you're using Redux for, then you can safely use context instead.
 
-Context does NOT give you Redux DevTools, Redux middleware, the ability to trace state updates, and all kinds of other goodies Redux offers you
-```
+"Context is great for passing down props without needing intermediary components. If that's all you're using Redux for, then you can safely use context instead.
+
+Context does NOT give you Redux DevTools, Redux middleware, the ability to trace state updates, and all kinds of other goodies Redux offers you"
+
 Here's Dan Abramov's take:
-```
-Context is an advanced feature and is subject to change. In some cases its conveniences outweigh its downsides so some libraries like React Redux and React Router choose to rely on it despite the experimental nature.
+
+"Context is an advanced feature and is subject to change. In some cases its conveniences outweigh its downsides so some libraries like React Redux and React Router choose to rely on it despite the experimental nature.
 
 The important part here is the word libraries. If context changes its behavior, we as library authors will need to adjust. However, as long as the library doesn’t ask you to directly use the context API, you as the user shouldn’t have to worry about changes to it.
 
-React Redux uses context internally but it doesn’t expose this fact in the public API. So you should feel much safer using context via React Redux than directly because if it changes, the burden of updating the code will be on React Redux and not you.
-```
+React Redux uses context internally but it doesn’t expose this fact in the public API. So you should feel much safer using context via React Redux than directly because if it changes, the burden of updating the code will be on React Redux and not you."
 
 ## Should you use context in your production applications as opposed to Redux?
 Probably not. Or if you do, use it for relatively static application wide settings (locale and theme are the two that immediately come to mind).
